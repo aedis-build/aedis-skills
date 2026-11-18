@@ -1,0 +1,51 @@
+# Release of these skills. On every push to main the next version comes from the Conventional Commits since the last
+# tag (Aedis Platform release-cut.yml: breaking → major, feat → minor, fix/perf/refactor/revert/deps → patch, anything
+# else → no release) and the tag vX.Y.Z goes straight on the commit: the version of the skills only exists in its tag,
+# which is what people install from. On top of the tag, release-tag.yml
+# publishes the immutable, attested GitHub Release with generated notes, moves the major tag `v1` and keeps the
+# CHANGELOG pull request. The first tag comes from a manual run with an explicit bump:
+#   gh workflow run release-cut -R aedis-build/aedis-skills -f bump=major
+# Tag, release and pull request are made by the Aedis code App (AEDIS_CODER_APP_* organization secrets); without
+# them the cut job warns and ends green.
+name: release-cut
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Increment (auto = from the commits since the last tag; patch/minor/major also cut the first release)"
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
+
+permissions: {}
+
+concurrency:
+  group: release-cut
+  cancel-in-progress: false
+
+jobs:
+  cut:
+    uses: aedis-build/aedis-platform/.github/workflows/release-cut.yml@af2f2aca355c38bac8e2d6da12e756f9d81033ae # v1.3.3
+    permissions:
+      contents: read
+    with:
+      bump: ${{ inputs.bump || 'auto' }}
+    secrets:
+      app-id: ${{ secrets.AEDIS_CODER_APP_ID }}
+      app-private-key: ${{ secrets.AEDIS_CODER_APP_PRIVATE_KEY }}
+
+  publish:
+    needs: cut
+    if: needs.cut.outputs.tag != ''
+    uses: aedis-build/aedis-platform/.github/workflows/release-tag.yml@af2f2aca355c38bac8e2d6da12e756f9d81033ae # v1.3.3
+    permissions:
+      contents: read
+    with:
+      tag: ${{ needs.cut.outputs.tag }}
+      platform-ref: af2f2aca355c38bac8e2d6da12e756f9d81033ae # v1.3.3: not the moving v1, since this job holds the App key
+    secrets:
+      app-id: ${{ secrets.AEDIS_CODER_APP_ID }}
+      app-private-key: ${{ secrets.AEDIS_CODER_APP_PRIVATE_KEY }}

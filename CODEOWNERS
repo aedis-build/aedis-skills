@@ -1,0 +1,9 @@
+# Owners by path. The skills (what agents read), their check, CI, this file, the security policy and the README (the
+# install commands people run) require review from platform security.
+*               @aedis-build/maintainers
+/skills/        @aedis-build/platform-security
+/test/          @aedis-build/platform-security
+/.github/       @aedis-build/platform-security
+/CODEOWNERS     @aedis-build/platform-security
+/SECURITY.md    @aedis-build/platform-security
+/README.md      @aedis-build/platform-security
