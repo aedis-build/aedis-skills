@@ -1,0 +1,52 @@
+# Quality pipeline of the skills: Conventional Commits and SAST (Semgrep with the Aedis rules) through the Aedis
+# Platform reusables, and the self-test: the check of the skills (text only, frontmatter, and the aedis-ui rules equal
+# to the ones Aedis UI publishes), its unit tests and REUSE. The daily run catches a new Aedis UI release whose rules
+# the skill does not carry yet. The gate (gate.yml) listens for the end of this workflow on pull requests.
+name: aedis-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+  schedule:
+    - cron: "41 5 * * *"
+
+# One run per pull request: a new push or closing the PR cancels the run in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  commits:
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    uses: aedis-build/aedis-platform/.github/workflows/conventional-commits.yml@af2f2aca355c38bac8e2d6da12e756f9d81033ae # v1.3.3
+    permissions:
+      contents: read
+    with:
+      platform-ref: af2f2aca355c38bac8e2d6da12e756f9d81033ae # v1.3.3: the reusable checks the platform out at this commit, not at the moving v1
+
+  sast:
+    if: github.event.action != 'closed'
+    uses: aedis-build/aedis-platform/.github/workflows/sast.yml@af2f2aca355c38bac8e2d6da12e756f9d81033ae # v1.3.3
+    permissions:
+      contents: read
+      security-events: write
+    with:
+      platform-ref: af2f2aca355c38bac8e2d6da12e756f9d81033ae # v1.3.3: the reusable checks the platform out at this commit, not at the moving v1
+
+  test:
+    if: github.event.action != 'closed'
+    name: Self-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 -I -m unittest discover -s test -v
+      - run: python3 -I test/check.py
+      - run: pipx run reuse==5.0.2 lint
